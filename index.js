@@ -11,43 +11,51 @@ const TARGET_SERVER = {
 };
 
 wss.on('connection', (ws, req) => {
-  console.log('Player connected via proxy from:', req.socket.remoteAddress);
+  console.log('[EaglerProxy] Client attempting connection from:', req.socket.remoteAddress);
 
   const tcpClient = new net.Socket();
+  
   tcpClient.connect(TARGET_SERVER.port, TARGET_SERVER.host, () => {
-    console.log('Successfully connected to Shockbyte backend.');
+    console.log('[EaglerProxy] Connected successfully to Shockbyte backend target.');
   });
 
-  ws.on('message', (message) => {
+  // Handle incoming data from the Eaglercraft Browser Client
+  ws.on('message', (message, isBinary) => {
     if (tcpClient.writable) {
+      // Pass the frame directly to the backend server
       tcpClient.write(message);
     }
   });
 
+  // Handle incoming data from the Shockbyte Backend Server
   tcpClient.on('data', (data) => {
     if (ws.readyState === ws.OPEN) {
-      ws.send(data);
+      // Send the packets back to the browser client as binary data
+      ws.send(data, { binary: true });
     }
   });
 
-  ws.on('close', () => {
-    console.log('Player disconnected.');
+  ws.on('close', (code, reason) => {
+    console.log(`[EaglerProxy] Browser client disconnected. Code: ${code}`);
     tcpClient.end();
   });
 
   tcpClient.on('close', () => {
-    ws.close();
+    console.log('[EaglerProxy] Shockbyte backend closed the TCP socket.');
+    if (ws.readyState === ws.OPEN) {
+      ws.close();
+    }
   });
 
   tcpClient.on('error', (err) => {
-    console.error('Shockbyte TCP error:', err.message);
+    console.error('[EaglerProxy] Shockbyte TCP error:', err.message);
     ws.close();
   });
 
   ws.on('error', (err) => {
-    console.error('WebSocket error:', err.message);
+    console.error('[EaglerProxy] Browser WebSocket error:', err.message);
     tcpClient.destroy();
   });
 });
 
-console.log(`Proxy running on port ${PORT}`);
+console.log(`[EaglerProxy] Secure WebSocket proxy active, listening on port ${PORT}`);
