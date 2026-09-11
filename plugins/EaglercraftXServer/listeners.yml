@@ -1,0 +1,4 @@
+[[listener_list]]
+listener_name = "listener0"
+bind_address = "0.0.0.0:8080"
+target_server = "lobby"
